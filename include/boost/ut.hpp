@@ -61,6 +61,7 @@ export import std;
 #include <memory>
 #include <optional>
 #include <regex>
+#include <stack>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
