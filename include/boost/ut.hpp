@@ -696,10 +696,10 @@ struct cfg {
     std::cout << "version:        " << BOOST_UT_VERSION << std::endl;
   }
 
-  static inline void parse(int argc, const char* const* argv) {
+  static inline void parse(int argc, const char* argv[]) {
     const size_t n_args = static_cast<std::size_t>(argc);
     if (argc > 0) {
-      executable_name = argv[0];
+      // executable_name = argv[0]; // <-TODO this segfaults ... ?!?
     }
     query_pattern = "";
     bool found_first_option = false;
@@ -3110,7 +3110,7 @@ using operators::operator>>;
 }  // namespace boost::inline ext::ut::inline v1_1_9
 
 #if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
-__attribute__((constructor)) inline void cmd_line_args(int argc, char** argv) {
+__attribute__((constructor)) inline void cmd_line_args(int argc, const char* argv[]) {
   ::boost::ut::detail::cfg::parse(argc, argv);
 }
 #else
