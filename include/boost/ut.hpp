@@ -58,6 +58,7 @@ export import std;
 #include <cstdint>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -1495,7 +1496,8 @@ class reporter_junit {
     std::size_t skipped = 0LU;
     std::size_t fails = 0LU;
     std::string report_string;
-    map<std::string, test_result> nested_tests;
+    std::unique_ptr<map<std::string, test_result>> nested_tests =
+        std::make_unique<map<std::string, test_result>>();
   };
   colors color_{};
   map<std::string, test_result> results_;
@@ -1516,10 +1518,10 @@ class reporter_junit {
   void check_for_scope(std::string_view test_name) {
     const std::string str_name(test_name);
     active_test_.push(str_name);
-    const auto [iter, inserted] = active_scope_->nested_tests.try_emplace(
+    const auto [iter, inserted] = active_scope_->nested_tests->try_emplace(
         str_name, active_scope_, detail::cfg::executable_name, active_suite_,
         str_name);
-    active_scope_ = &active_scope_->nested_tests.at(str_name);
+    active_scope_ = &active_scope_->nested_tests->at(str_name);
     if (active_test_.size() == 1) {
       reset_printer();
     }
@@ -1625,7 +1627,7 @@ class reporter_junit {
       active_scope_->passed += 1LU;
       if (report_type_ == CONSOLE) {
         if (detail::cfg::show_successful_tests) {
-          if (!active_scope_->nested_tests.empty()) {
+          if (!active_scope_->nested_tests->empty()) {
             ss_out_ << "\n";
             ss_out_ << std::string(2 * active_test_.size() - 2, ' ');
             ss_out_ << "Running test \"" << test.name << "\" - ";
@@ -1651,7 +1653,7 @@ class reporter_junit {
 
   auto on(events::test_skip test) -> void {
     ss_out_.clear();
-    if (!active_scope_->nested_tests.contains(std::string(test.name))) {
+    if (!active_scope_->nested_tests->contains(std::string(test.name))) {
       check_for_scope(test.name);
       active_scope_->status = "SKIPPED";
       active_scope_->skipped += 1;
@@ -1759,7 +1761,7 @@ class reporter_junit {
         std::cerr
             << "\n========================================================"
                "=======================\n"
-            << "Suite " << suite_name //
+            << "Suite " << suite_name  //
             << "tests:   " << (suite_result.n_tests) << " | " << color_.fail
             << suite_result.fails << " failed" << color_.none << '\n'
             << "asserts: " << (suite_result.assertions) << " | "
@@ -1768,7 +1770,8 @@ class reporter_junit {
             << color_.none << '\n';
         std::cerr << std::endl;
       } else {
-        std::cout << color_.pass << "Suite '" << suite_name << "': all tests passed" << color_.none << " ("
+        std::cout << color_.pass << "Suite '" << suite_name
+                  << "': all tests passed" << color_.none << " ("
                   << suite_result.assertions << " asserts in "
                   << suite_result.n_tests << " tests)\n";
 
@@ -1805,7 +1808,7 @@ class reporter_junit {
   }
   void print_result(const std::string& suite_name, std::string indent,
                     const test_result& parent) {
-    for (const auto& [name, result] : parent.nested_tests) {
+    for (const auto& [name, result] : *parent.nested_tests) {
       std::cout << indent;
       std::cout << "<testcase classname=\"" << result.suite_name << '\"';
       std::cout << " name=\"" << name << '\"';
@@ -1819,9 +1822,9 @@ class reporter_junit {
       std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
                 << "\"";
       std::cout << " status=\"" << result.status << '\"';
-      if (result.report_string.empty() && result.nested_tests.empty()) {
+      if (result.report_string.empty() && result.nested_tests->empty()) {
         std::cout << " />\n";
-      } else if (!result.nested_tests.empty()) {
+      } else if (!result.nested_tests->empty()) {
         std::cout << " />\n";
         print_result(suite_name, indent + "  ", result);
         std::cout << indent << "</testcase>\n";
