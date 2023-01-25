@@ -615,6 +615,8 @@ struct cfg {
   static inline reflection::source_location location{};
   static inline bool wip{};
 
+  static inline int largc = 0;
+  static inline const char** largv = nullptr;
   static inline std::string executable_name = "unknown executable";
   static inline std::string query_pattern = "";        // <- done
   static inline bool invert_query_pattern = false;     // <- done
@@ -698,8 +700,10 @@ struct cfg {
 
   static inline void parse(int argc, const char* argv[]) {
     const size_t n_args = static_cast<std::size_t>(argc);
-    if (argc > 0) {
-      // executable_name = argv[0]; // <-TODO this segfaults ... ?!?
+    if (n_args > 0 && argv != nullptr) {
+      cfg::largc = argc;
+      cfg::largv = argv;
+      executable_name = argv[0];
     }
     query_pattern = "";
     bool found_first_option = false;
@@ -1574,6 +1578,8 @@ class reporter_junit {
     printer_ = static_cast<TPrinter&&>(printer);
   }
   reporter_junit() : lcout_(std::cout.rdbuf()) {
+    ::boost::ut::detail::cfg::parse(detail::cfg::largc, detail::cfg::largv);
+
     if (detail::cfg::show_reporters) {
       std::cout << "available reporter:\n";
       std::cout << "  console (default)\n";
@@ -3110,8 +3116,10 @@ using operators::operator>>;
 }  // namespace boost::inline ext::ut::inline v1_1_9
 
 #if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
-__attribute__((constructor)) inline void cmd_line_args(int argc, const char* argv[]) {
-  ::boost::ut::detail::cfg::parse(argc, argv);
+__attribute__((constructor)) inline void cmd_line_args(int argc,
+                                                       const char* argv[]) {
+  ::boost::ut::detail::cfg::largc = argc;
+  ::boost::ut::detail::cfg::largv = argv;
 }
 #else
 // add MSV/windows related code here (optional)
