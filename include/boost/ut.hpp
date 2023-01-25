@@ -1945,8 +1945,8 @@ class runner {
     if (!detail::cfg::query_pattern.empty()) {  //
       const static std::regex regex(detail::cfg::query_regex_pattern);
       bool matches = std::regex_match(test.name.data(), regex);
-      for (const auto& tag : test.tag) {
-        matches |= std::regex_match(tag.data(), regex);
+      for (const auto& tag2 : test.tag) {
+        matches |= std::regex_match(tag2.data(), regex);
       }
       if (matches) {
         execute = !detail::cfg::invert_query_pattern;
