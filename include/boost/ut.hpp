@@ -539,7 +539,7 @@ test(std::string_view, std::string_view, std::string_view,
 template <class TSuite>
 struct suite {
   TSuite run{};
-  std::string name{"unknown suite"};
+  std::string_view name{};
   constexpr auto operator()() { run(); }
   constexpr auto operator()() const { run(); }
 };
@@ -1753,7 +1753,7 @@ class reporter_junit {
  protected:
   void print_duration(auto& printer) const noexcept {
     if (detail::cfg::show_duration) {
-      long time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          active_scope_->run_stop - active_scope_->run_start)
                          .count();
       // rounded to nearest ms
@@ -1802,7 +1802,7 @@ class reporter_junit {
       std::cout << " errors=\"" << suite_result.fails << '\"';
       std::cout << " failures=\"" << suite_result.fails << '\"';
       std::cout << " skipped=\"" << suite_result.skipped << '\"';
-      long time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          suite_result.run_stop - suite_result.run_start)
                          .count();
       std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
@@ -1823,7 +1823,7 @@ class reporter_junit {
       std::cout << " errors=\"" << result.fails << '\"';
       std::cout << " failures=\"" << result.fails << '\"';
       std::cout << " skipped=\"" << result.skipped << '\"';
-      long time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          result.run_stop - result.run_start)
                          .count();
       std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
@@ -1911,7 +1911,7 @@ class runner {
 
   template <class TSuite>
   auto on(events::suite<TSuite> suite) {
-    suites_.push_back({suite.run, suite.name});
+    suites_.emplace_back(suite.run, suite.name);
   }
 
   template <class... Ts>
@@ -2083,7 +2083,7 @@ class runner {
 
  protected:
   TReporter reporter_{};
-  std::vector<std::pair<void (*)(), std::string>> suites_{};
+  std::vector<std::pair<void (*)(), std::string_view>> suites_{};
   std::size_t level_{};
   bool run_{};
   std::size_t fails_{};
@@ -2865,7 +2865,7 @@ struct _t : detail::value<T> {
 template <fixed_string suite_name = "unnamed suite">
 struct suite {
   reflection::source_location location{};
-  std::string name = std::string(suite_name);
+  std::string_view name = std::string_view(suite_name);
   template <class TSuite>
   constexpr /*explicit(false)*/ suite(TSuite _suite) {
     static_assert(1 == sizeof(_suite));
