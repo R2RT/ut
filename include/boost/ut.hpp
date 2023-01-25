@@ -628,9 +628,10 @@ struct cfg {
   static inline std::string output_filename = "";
   static inline std::string use_reporter = "console";  // <- done
   static inline std::string suite_name = "";
-  static inline bool abort_early = false;                 // <- done
-  static inline std::size_t abort_after_n_failures = -1;  // <- done
-  static inline bool show_duration = false;               // <- done
+  static inline bool abort_early = false;  // <- done
+  static inline std::size_t abort_after_n_failures =
+      std::numeric_limits<std::size_t>::max();  // <- done
+  static inline bool show_duration = false;     // <- done
   static inline std::size_t show_min_duration = 0;
   static inline std::string input_filename = "";
   static inline bool show_test_names = false;  // <- done
@@ -1754,8 +1755,8 @@ class reporter_junit {
   void print_duration(auto& printer) const noexcept {
     if (detail::cfg::show_duration) {
       int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         active_scope_->run_stop - active_scope_->run_start)
-                         .count();
+                            active_scope_->run_stop - active_scope_->run_start)
+                            .count();
       // rounded to nearest ms
       double time_s = static_cast<double>(time_ms) / 1000.0;
       printer << " after " << time_s << " seconds";
@@ -1803,8 +1804,8 @@ class reporter_junit {
       std::cout << " failures=\"" << suite_result.fails << '\"';
       std::cout << " skipped=\"" << suite_result.skipped << '\"';
       int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         suite_result.run_stop - suite_result.run_start)
-                         .count();
+                            suite_result.run_stop - suite_result.run_start)
+                            .count();
       std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
                 << '\"';
       std::cout << " version=\"" << BOOST_UT_VERSION << "\" />\n";
@@ -1824,8 +1825,8 @@ class reporter_junit {
       std::cout << " failures=\"" << result.fails << '\"';
       std::cout << " skipped=\"" << result.skipped << '\"';
       int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         result.run_stop - result.run_start)
-                         .count();
+                            result.run_stop - result.run_start)
+                            .count();
       std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
                 << "\"";
       std::cout << " status=\"" << result.status << '\"';
