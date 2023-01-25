@@ -61,8 +61,8 @@ export import std;
 #include <memory>
 #include <optional>
 #include <regex>
-#include <stack>
 #include <sstream>
+#include <stack>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -1496,7 +1496,7 @@ class reporter_junit {
     std::size_t passed = 0LU;
     std::size_t skipped = 0LU;
     std::size_t fails = 0LU;
-    std::string report_string;
+    std::string report_string{};
     std::unique_ptr<map<std::string, test_result>> nested_tests =
         std::make_unique<map<std::string, test_result>>();
   };
@@ -1520,8 +1520,8 @@ class reporter_junit {
     const std::string str_name(test_name);
     active_test_.push(str_name);
     const auto [iter, inserted] = active_scope_->nested_tests->try_emplace(
-        str_name, active_scope_, detail::cfg::executable_name, active_suite_,
-        str_name);
+        str_name, test_result{active_scope_, detail::cfg::executable_name,
+                              active_suite_, str_name});
     active_scope_ = &active_scope_->nested_tests->at(str_name);
     if (active_test_.size() == 1) {
       reset_printer();
