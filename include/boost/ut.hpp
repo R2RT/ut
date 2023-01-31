@@ -1617,17 +1617,17 @@ class reporter_junit {
     active_scope_ = &results_[active_suite_];
   }
 
-  auto on(events::test_begin test) -> void {  // starts outermost test
-    check_for_scope(test.name);
+  auto on(events::test_begin test_event) -> void {  // starts outermost test
+    check_for_scope(test_event.name);
 
     if (report_type_ == CONSOLE) {
       ss_out_ << "\n";
       ss_out_ << std::string(2 * active_test_.size() - 2, ' ');
-      ss_out_ << "Running test \"" << test.name << "\"... ";
+      ss_out_ << "Running test \"" << test_event.name << "\"... ";
     }
   }
 
-  auto on(events::test_end test) -> void {
+  auto on(events::test_end test_event) -> void {
     if (active_scope_->fails > 0) {
       reset_printer();
     } else {
@@ -1638,7 +1638,7 @@ class reporter_junit {
           if (!active_scope_->nested_tests->empty()) {
             ss_out_ << "\n";
             ss_out_ << std::string(2 * active_test_.size() - 2, ' ');
-            ss_out_ << "Running test \"" << test.name << "\" - ";
+            ss_out_ << "Running test \"" << test_event.name << "\" - ";
           }
           ss_out_ << color_.pass << "PASSED" << color_.none;
           print_duration(ss_out_);
@@ -1648,30 +1648,30 @@ class reporter_junit {
       }
     }
 
-    pop_scope(test.name);
+    pop_scope(test_event.name);
   }
 
-  auto on(events::test_run test) -> void {  // starts nested test
-    on(events::test_begin{.type = test.type, .name = test.name});
+  auto on(events::test_run test_event) -> void {  // starts nested test
+    on(events::test_begin{.type = test_event.type, .name = test_event.name});
   }
 
-  auto on(events::test_finish test) -> void {  // finishes nested test
-    on(events::test_end{.type = test.type, .name = test.name});
+  auto on(events::test_finish test_event) -> void {  // finishes nested test
+    on(events::test_end{.type = test_event.type, .name = test_event.name});
   }
 
-  auto on(events::test_skip test) -> void {
+  auto on(events::test_skip test_event) -> void {
     ss_out_.clear();
-    if (!active_scope_->nested_tests->contains(std::string(test.name))) {
-      check_for_scope(test.name);
+    if (!active_scope_->nested_tests->contains(std::string(test_event.name))) {
+      check_for_scope(test_event.name);
       active_scope_->status = "SKIPPED";
       active_scope_->skipped += 1;
       if (report_type_ == CONSOLE) {
         lcout_ << '\n' << std::string(2 * active_test_.size() - 2, ' ');
-        lcout_ << "Running \"" << test.name << "\"... ";
+        lcout_ << "Running \"" << test_event.name << "\"... ";
         lcout_ << color_.skip << "SKIPPED" << color_.none;
       }
       reset_printer();
-      pop_scope(test.name);
+      pop_scope(test_event.name);
     }
   }
 
