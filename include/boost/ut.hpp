@@ -1616,9 +1616,7 @@ class reporter_junit {
   void pop_scope(std::string_view test_name_sv) {
     const std::string test_name(test_name_sv);
     active_scope_->run_stop = clock_ref::now();
-    if (active_scope_->skipped) {
-      active_scope_->status = "SKIPPED";
-    } else {
+    if (active_scope_->status != "SKIPPED") {
       active_scope_->status = active_scope_->fails > 0 ? "FAILED" : "PASSED";
     }
     active_scope_->assertions =
@@ -1667,9 +1665,7 @@ class reporter_junit {
     } else {
       report_type_ = CONSOLE;
     }
-    if (!detail::cfg::use_colour.starts_with("yes")) {
-      color_ = {"", "", "", ""};
-    }
+    report_type_ = JUNIT;  // TODO: requires explicit args
     if (!detail::cfg::show_tests && !detail::cfg::show_test_names) {
       std::cout.rdbuf(ss_out_.rdbuf());
     }
@@ -1868,58 +1864,89 @@ class reporter_junit {
     }
   }
 
+  // Duration in fractional seconds
+  static double duration(timePoint start, timePoint stop) {
+    std::int64_t time_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)
+            .count();
+    return (static_cast<double>(time_ms) / 1000.0);
+  }
+
   void print_junit_summary() {
     // mock junit output:
     std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    std::size_t errors = 0;
+    std::size_t fails = 0;
+    std::size_t n_tests = 0;
+    timePoint run_start = timePoint::max();
+    timePoint run_stop = timePoint::min();
+
+    for (const auto& [suite_name, x] : results_) {
+      const test_result& suite_result = x;
+      errors += suite_result.fails;
+      fails += suite_result.fails;
+      n_tests += suite_result.n_tests;
+      using std::max;
+      using std::min;
+      run_start = min(run_start, suite_result.run_start);
+      run_stop = max(run_stop, suite_result.run_stop);
+    }
+
+    std::cout << "<testsuites";
+    std::cout << " name=\"" << detail::cfg::executable_name << '\"';
+    std::cout << " errors=\"" << errors << '\"';
+    std::cout << " failures=\"" << fails << '\"';
+    std::cout << " tests=\"" << n_tests << '\"';
+    std::cout << " time=\"" << duration(run_start, run_stop) << "\">\n";
+
     for (const auto& [suite_name, suite_result] : results_) {
-      std::cout << "<testsuites";
-      std::cout << " classname=\"" << detail::cfg::executable_name << '\"';
+      if (suite_result.nested_tests->empty()) {
+        continue;
+      }
+      std::cout << "  <testsuite";
       std::cout << " name=\"" << suite_name << '\"';
       std::cout << " tests=\"" << suite_result.n_tests << '\"';
       std::cout << " errors=\"" << suite_result.fails << '\"';
       std::cout << " failures=\"" << suite_result.fails << '\"';
       std::cout << " skipped=\"" << suite_result.skipped << '\"';
-      std::int64_t time_ms =
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              suite_result.run_stop - suite_result.run_start)
-              .count();
-      std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
-                << '\"';
-      std::cout << " version=\"" << BOOST_UT_VERSION << "\" />\n";
-      print_result(suite_name, " ", suite_result);
-      std::cout << "</testsuites>\n";
+      std::cout << " time=\""
+                << duration(suite_result.run_start, suite_result.run_stop)
+                << "\">\n";
+      print_result(suite_name, "    ", "", suite_result);
+      std::cout << "  </testsuite>\n";
       std::cout.flush();
     }
+    std::cout << "</testsuites>\n";
   }
+
   void print_result(const std::string& suite_name, std::string indent,
-                    const test_result& parent) {
+                    std::string name_prefix, const test_result& parent) {
     for (const auto& [name, result] : *parent.nested_tests) {
       std::cout << indent;
       std::cout << "<testcase classname=\"" << result.suite_name << '\"';
-      std::cout << " name=\"" << name << '\"';
-      std::cout << " tests=\"" << result.assertions << '\"';
-      std::cout << " errors=\"" << result.fails << '\"';
-      std::cout << " failures=\"" << result.fails << '\"';
-      std::cout << " skipped=\"" << result.skipped << '\"';
-      std::int64_t time_ms =
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              result.run_stop - result.run_start)
-              .count();
-      std::cout << " time=\"" << (static_cast<double>(time_ms) / 1000.0)
+      std::cout << " name=\"" << name_prefix << name << '\"';
+      std::cout << " assertions=\"" << result.assertions << '\"';
+      std::cout << " time=\"" << duration(result.run_start, result.run_stop)
                 << "\"";
       std::cout << " status=\"" << result.status << '\"';
-      if (result.report_string.empty() && result.nested_tests->empty()) {
-        std::cout << " />\n";
-      } else if (!result.nested_tests->empty()) {
-        std::cout << " />\n";
-        print_result(suite_name, indent + "  ", result);
-        std::cout << indent << "</testcase>\n";
-      } else if (!result.report_string.empty()) {
+      auto systemout = !result.report_string.empty();
+      auto skipped = result.status == "SKIPPED";
+      if (systemout || skipped) {
         std::cout << ">\n";
-        std::cout << indent << indent << "<system-out>\n";
-        std::cout << result.report_string << "\n";
-        std::cout << indent << indent << "</system-out>\n";
+        if (systemout) {
+          std::cout << indent << "  <system-out>";
+          std::cout << result.report_string << "</system-out>\n";
+        }
+        if (skipped) {
+          std::cout << indent << "  <skipped message=\"skipped\"/>\n";
+        }
         std::cout << indent << "</testcase>\n";
+      } else {
+        std::cout << "/>\n";
+      }
+
+      if (!result.nested_tests->empty()) {
+        print_result(suite_name, indent, name + "/", result);
       }
     }
   }
@@ -2178,7 +2205,8 @@ class runner {
 struct override {};
 
 template <class = override, class...>
-//[[maybe_unused]] inline auto cfg = runner<reporter<printer>>{};// alt reporter
+//[[maybe_unused]] inline auto cfg = runner<reporter<printer>>{};// alt
+// reporter
 [[maybe_unused]] inline auto cfg = runner<reporter_junit<printer>>{};
 
 namespace detail {
